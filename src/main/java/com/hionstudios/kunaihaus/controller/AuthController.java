@@ -1,7 +1,7 @@
 package com.hionstudios.kunaihaus.controller;
 
-import javax.annotation.security.PermitAll;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.annotation.security.PermitAll;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

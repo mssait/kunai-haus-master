@@ -2,27 +2,23 @@ package com.hionstudios.security;
 
 import java.util.Arrays;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.json.JSONObject;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
-import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 
 import com.hionstudios.db.Handler;
@@ -31,21 +27,19 @@ import com.hionstudios.iam.JwtRequestFilter;
 
 @Configuration
 @EnableWebSecurity
-@EnableGlobalMethodSecurity(prePostEnabled = true)
-public class BasicSecurityConfiguration extends WebSecurityConfigurerAdapter {
+@EnableMethodSecurity(prePostEnabled = true, jsr250Enabled = true)
+public class BasicSecurityConfiguration {
     private final UserDetailsService userDetailsService;
-    @Autowired
-    private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+    private final JwtRequestFilter jwtRequestFilter;
 
-    @Autowired
-    private UserDetailsService jwtUserDetailsService;
-
-    @Autowired
-    private JwtRequestFilter jwtRequestFilter;
-
-    @Autowired
-    public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
-        auth.userDetailsService(jwtUserDetailsService).passwordEncoder(NoPasswordEncoder.getInstance());
+    BasicSecurityConfiguration(
+            UserDetailsService userDetailsService,
+            JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
+            JwtRequestFilter jwtRequestFilter) {
+        this.userDetailsService = userDetailsService;
+        this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
+        this.jwtRequestFilter = jwtRequestFilter;
     }
 
     @Bean
@@ -54,28 +48,15 @@ public class BasicSecurityConfiguration extends WebSecurityConfigurerAdapter {
     }
 
     @Bean
-    @Override
-    public AuthenticationManager authenticationManagerBean() throws Exception {
-        return super.authenticationManagerBean();
+    public AuthenticationManager authenticationManager() {
+        return new ProviderManager(authProvider());
     }
 
-    @Autowired
-    BasicSecurityConfiguration(UserDetailsService userDetailsService) {
-        this.userDetailsService = userDetailsService;
-    }
-
-    @Bean
-    public AuthenticationProvider authProvider() {
+    private DaoAuthenticationProvider authProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userDetailsService);
         provider.setPasswordEncoder(NoPasswordEncoder.getInstance());
         return provider;
-    }
-
-    @Bean
-    @Override
-    protected UserDetailsService userDetailsService() {
-        return super.userDetailsService();
     }
 
     private static void successHandler(
@@ -95,24 +76,27 @@ public class BasicSecurityConfiguration extends WebSecurityConfigurerAdapter {
         return cors;
     }
 
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors().configurationSource(BasicSecurityConfiguration::corsConfigurationSource)
-                .and()
-                .csrf().disable()
-                .authorizeRequests()
-                .and().exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
-                .and().sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                .and().formLogin()
-                .loginProcessingUrl("/login")
-                .successHandler(BasicSecurityConfiguration::successHandler)
-                .loginPage("/login").failureForwardUrl("/").permitAll()
-                .and().logout()
-                .invalidateHttpSession(true)
-                .clearAuthentication(true)
-                .deleteCookies("Kunai-Haus-auth")
-                .logoutRequestMatcher(new AntPathRequestMatcher("/logout")).logoutSuccessUrl("/");
+                .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
+                .cors(cors -> cors.configurationSource(BasicSecurityConfiguration::corsConfigurationSource))
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .exceptionHandling(exception -> exception.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .formLogin(form -> form
+                        .loginProcessingUrl("/login")
+                        .successHandler(BasicSecurityConfiguration::successHandler)
+                        .loginPage("/login")
+                        .failureForwardUrl("/")
+                        .permitAll())
+                .logout(logout -> logout
+                        .invalidateHttpSession(true)
+                        .clearAuthentication(true)
+                        .deleteCookies("Kunai-Haus-auth")
+                        .logoutUrl("/logout")
+                        .logoutSuccessUrl("/"));
+        return http.build();
     }
 }

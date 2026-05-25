@@ -12,7 +12,7 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.javalite.activejdbc.Base;
 import org.javalite.activejdbc.RowListenerAdapter;

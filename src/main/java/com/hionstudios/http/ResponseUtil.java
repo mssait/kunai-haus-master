@@ -2,7 +2,7 @@ package com.hionstudios.http;
 
 import java.util.concurrent.TimeUnit;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
